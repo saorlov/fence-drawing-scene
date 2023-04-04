@@ -51,7 +51,7 @@ const ShowScene = () => {
                 <PerspectiveCamera
                     ref={cameraRef}
                     makeDefault
-                    args={[75, 450 / 450, .1, 40]}
+                    args={[75, 450 / 450, .1, 100]}
                     position={[0, 7, 10]}
                 />
                 {/*<axesHelper args={[5]} />*/}
