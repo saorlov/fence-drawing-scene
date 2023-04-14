@@ -1,41 +1,21 @@
-import {useContext, useRef,} from "react";
+import {useRef} from "react";
 import React from 'react'
-import {DrawContext} from "../../../context/Contexts";
-import {Canvas, useLoader} from "@react-three/fiber";
+import {Canvas} from "@react-three/fiber";
 import {OrbitControls, PerspectiveCamera} from "@react-three/drei";
-import {TextureLoader} from "three";
 import Lines from "./Lines";
+import useWindowSize from "../../../hooks/useWindowSize";
+import {SceneProps} from "../../../models/types";
 
-const ShowScene = () => {
+const ShowScene = ({ratio}: SceneProps) => {
 
-    const ctx = useContext(DrawContext)
     const cameraRef = useRef(null)
-    const points = ctx.points
-    const ratio = 450
-    const colorMap = useLoader(TextureLoader, 'textures/Brick_Wall_009_COLOR.jpg')
-    const pillarMaterial = <meshStandardMaterial map={colorMap} color={'pink'} />
+    const appViewport = useWindowSize()
+    const canvasWidth = appViewport.windowWidth && appViewport.windowWidth > 450 ? 450 : 320
 
     return (
-        <div style={{width: "450px", height: "450px"}}>
+        <div style={{width: ratio, height: ratio}}>
             <Canvas>
-                {
-                    points.map((point, i) => {
-                        return (
-                            <mesh
-                                key={i}
-                                position={[
-                                    (point[0] / ratio - .5) * 9,
-                                    .3,
-                                    (point[1] / ratio - .5) * 9,
-                                ]}
-                            >
-                                <boxGeometry args={[.1, .6, .1]} />
-                                {pillarMaterial}
-                            </mesh>
-                        )
-                    })
-                }
-                <Lines />
+                <Lines ratio={ratio} />
                 <mesh
                     rotation={[
                         -Math.PI * .5, 0, 0
@@ -51,7 +31,7 @@ const ShowScene = () => {
                 <PerspectiveCamera
                     ref={cameraRef}
                     makeDefault
-                    args={[75, 450 / 450, .1, 100]}
+                    args={[75, ratio / ratio, .1, 100]}
                     position={[0, 7, 10]}
                 />
                 {/*<axesHelper args={[5]} />*/}

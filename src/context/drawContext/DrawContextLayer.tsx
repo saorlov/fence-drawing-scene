@@ -1,6 +1,7 @@
 import {useEffect, useState} from "react";
 import { DrawContext } from "../Contexts";
 import {CtxProps, FenceLine, FencePoint, InitialDrawCtxValue} from "../../models/types";
+import useWindowSize from "../../hooks/useWindowSize";
 
 function DrawContextLayer({ children }: CtxProps) {
 

@@ -2,34 +2,11 @@ import { Stage, Layer, Shape, Circle, Text } from 'react-konva';
 import {useState, useRef, useEffect, useContext} from "react";
 import {DrawContext} from "../../../context/Contexts";
 import disableScroll from 'disable-scroll';
+import {divideLine, checkPoint} from './DrawFunctions'
+import {Button, Box, ButtonGroup} from '@chakra-ui/react'
+import useWindowSize from "../../../hooks/useWindowSize";
 
-const divideLine = (point1, point2, interval) => {
-    const parametricLine = (p1, p2, step) => {
-        return [p1[0] + (p2[0] - p1[0]) * step, p1[1] + (p2[1] - p1[1]) * step]
-    }
-
-    const step = interval / ((point1[0] - point2[0]) ** 2 + (point1[1] - point2[1]) ** 2) ** .5
-    const points = []
-    let i = 1
-    points.push(point1)
-    while (step * i < 1)  {
-        points.push(parametricLine(point1, point2, step * i))
-        i += 1
-    }
-    points.push(point2)
-    return points
-}
-
-const checkPoint = (newPoint, points) => {
-    for (let posKey of points) {
-        let [x, y] = posKey
-        const distance = ((x - newPoint[0]) ** 2 + (y - newPoint[1]) ** 2) ** .5
-        if (distance <= 15) return false
-    }
-    return true
-}
-
-const DrawCanvas = () => {
+const DrawCanvas = (props) => {
     const ctx = useContext(DrawContext)
     const [tool, setTool] = useState('pen')
     const [currentLine, setCurrentLine] = useState({})
@@ -45,11 +22,12 @@ const DrawCanvas = () => {
     const setPoints = ctx.setPoints
     const lines = ctx.lines
     const setLines = ctx.setLines
+    const [lastAction, setLastAction] = useState(null)
     const [recentlyAdded, setRecentlyAdded] = useState(false)
     const isDrawing = useRef(false);
     const pointRef = useRef(null)
     const [activityCounter, setActivityCounter] = useState(0)
-    const interval = 3.5 * 17
+    const interval = 3.5 * 17.4 // 1 : 1
 
     useEffect(() => {
         if (recentlyAdded) {
@@ -70,7 +48,7 @@ const DrawCanvas = () => {
     }, [lines, recentlyAdded, setRecentlyAdded, points, setPoints, interval])
 
     const handleMouseDown = (e) => {
-        if (!isDrawing.current) {
+        if (!isDrawing.current && tool === 'pen') {
             disableScroll.on()
             isDrawing.current = true;
             const pos = e.target.getStage().getPointerPosition();
@@ -132,12 +110,16 @@ const DrawCanvas = () => {
         if (isNearest) {
             newLine = {
                 ...currentLine.points,
+                id: Date.now(),
                 end: [nearestX, nearestY],
+                points: divideLine(currentLine.points.start, [nearestX, nearestY], interval)
             }
         } else {
             newLine = {
                 ...currentLine.points,
+                id: Date.now(),
                 end: [cursorPosition.x, cursorPosition.y],
+                points: divideLine(currentLine.points.start, [cursorPosition.x, cursorPosition.y], interval)
             }
         }
         setLines([...lines, newLine])
@@ -151,7 +133,7 @@ const DrawCanvas = () => {
     }
 
     const handlePointHover = (e) => {
-        e.target.attrs.fill = 'red'
+        e.target.attrs.fill = 'blue'
         setActivityCounter(activityCounter + 1)
 
     }
@@ -161,11 +143,89 @@ const DrawCanvas = () => {
         setActivityCounter(activityCounter + 1)
     }
 
+    const handleUndo = () => {
+        if (lines.length) {
+            const actions = [...lines]
+            const lastAction = actions.pop()
+            setLastAction({
+                lines: lastAction,
+                points: null
+            })
+            setLines(actions)
+        }
+    }
+
+    const handleRedo = () => {
+        if (!lastAction) return
+        const actions = [...lines, lastAction.lines]
+        setLines(actions)
+        setLastAction(null)
+    }
+
+    const handleClear = () => {
+        setLines([])
+        setPoints([])
+    }
+
+    // const handleDragStart = (e) => {
+    //     const id = e.target.attrs
+    //     console.log(id)
+    //     const items = lines.slice();
+    //     const item = items.find((i) => i.id === id);
+    //     const index = items.indexOf(item);
+    //     // // remove from the list:
+    //     // items.splice(index, 1);
+    //     // // add to the top
+    //     // items.push(item);
+    //     // this.setState({
+    //     //     items,
+    //     // });
+    // };
+    // const onDragEnd = (e) => {
+    //     const id = e.target.attrs.id
+    //     const items = lines.slice();
+    //     const item = items.find((i) => i.id === id);
+    //     const index = items.indexOf(item);
+    //     // update item position
+    //     items[index] = {
+    //         ...item,
+    //         x: e.target.x(),
+    //         y: e.target.y(),
+    //     };
+    //     this.setState({ items });
+    // };
+
     return (
         <div >
+            <Box
+                display={'flex'}
+                alignItems={'center'}
+                justifyContent={'center'}
+                gap={'5'}
+            >
+                <Button
+                    colorScheme='blackAlpha'
+                    onClick={handleUndo}
+                >
+                    Отменить
+                </Button>
+                <Button
+                    colorScheme='blackAlpha'
+                    onClick={handleRedo}
+                >
+                    Вернуть
+                </Button>
+                <Button
+                    colorScheme='blackAlpha'
+                    onClick={handleClear}
+                >
+                    Очистить
+                </Button>
+            </Box>
+
             <Stage
-                width={450}
-                height={450}
+                width={props.ratio}
+                height={props.ratio}
                 onMouseDown={handleMouseDown}
                 onMousemove={handleMouseMove}
                 onMouseup={handleMouseUp}
@@ -176,33 +236,41 @@ const DrawCanvas = () => {
                 <Layer>
                     <Text text="Область для рисования" x={5} y={30} />
                     {lines.map((line, i) => (
-                        <Shape
-                            sceneFunc={(context, shape) => {
-                                context.beginPath();
-                                context.moveTo(line.start[0], line.start[1]);
-                                context.lineTo(line.end[0], line.end[1]);
-                                context.closePath();
-                                context.fillStrokeShape(shape);
-                            }}
-                            key = {i}
-                            fill="#00D2FF"
-                            stroke="black"
-                            strokeWidth={5}
-                        />
-                    ))}
-                    {points.map((point, i) => (
-                        <Circle
-                            key={i}
-                            ref={pointRef}
-                            onMouseEnter={handlePointHover}
-                            onMouseLeave={handlePointHoverOut}
-                            x={point[0]}
-                            y={point[1]}
-                            radius={4}
-                            stroke={"black"}
-                            strokeWidth={2}
-                            fill="white"
-                        />
+                        <>
+                            <Shape
+                                sceneFunc={(context, shape) => {
+                                    context.beginPath();
+                                    for (let j = 0; j < line.points.length - 1; j++) {
+                                        context.moveTo(line.points[j][0], line.points[j][1])
+                                        context.lineTo(line.points[j + 1][0], line.points[j + 1][1])
+                                    }
+                                    context.closePath();
+                                    context.fillStrokeShape(shape);
+                                }}
+                                // draggable={tool === 'move'}
+                                key={i}
+                                id={`${line.id}`}
+                                // onDragStart={handleDragStart}
+                                // onDragEnd={onDragEnd}
+                                fill="#00D2FF"
+                                stroke="black"
+                                strokeWidth={5}
+                            />
+                            {line.points.map((point, j) => (
+                                <Circle
+                                    key={j}
+                                    onMouseEnter={handlePointHover}
+                                    onMouseLeave={handlePointHoverOut}
+                                    x={point[0]}
+                                    y={point[1]}
+                                    radius={4}
+                                    stroke={"black"}
+                                    strokeWidth={2}
+                                    fill="white"
+                                />
+                            ))}
+                        </>
+
                     ))}
                     {
                         currentLine.points &&
@@ -221,20 +289,26 @@ const DrawCanvas = () => {
                     }
                 </Layer>
             </Stage>
-            {/*<select*/}
-            {/*    value={tool}*/}
-            {/*    onChange={(e) => {*/}
-            {/*        setTool(e.target.value);*/}
-            {/*    }}*/}
-            {/*>*/}
-            {/*    <option value="pen">Pen</option>*/}
-            {/*    <option value="eraser">Eraser</option>*/}
-            {/*</select>*/}
             <div>
-                <span>Cost: </span><span>{ctx.cost.toFixed(2)}&nbsp;RUB</span>
-            </div>
-            <div>
-                <span>Fence Length: </span><span>{ctx.length.toFixed(2)}&nbsp;m</span>
+                <div>
+                    <div>
+                        <span>Стоимость: </span><span>{ctx.cost.toFixed(2)}&nbsp;RUB</span>
+                    </div>
+                    <div>
+                        <span>Общая длина забора: </span><span>{ctx.length.toFixed(2)}&nbsp;m</span>
+                    </div>
+                </div>
+                {/*<div>*/}
+                {/*    <select*/}
+                {/*        value={tool}*/}
+                {/*        onChange={(e) => {*/}
+                {/*            setTool(e.target.value);*/}
+                {/*        }}*/}
+                {/*    >*/}
+                {/*        <option value="pen">Перо</option>*/}
+                {/*        <option value="move">Переместить</option>*/}
+                {/*    </select>*/}
+                {/*</div>*/}
             </div>
         </div>
     );

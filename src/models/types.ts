@@ -3,8 +3,10 @@ import {Dispatch, SetStateAction} from "react";
 export type FencePoint = Array<number>
 
 export interface FenceLine {
+    id: number,
     start: FencePoint,
     end: FencePoint,
+    points: FencePoint[]
 }
 
 export interface InitialDrawCtxValue {
@@ -18,4 +20,8 @@ export interface InitialDrawCtxValue {
 
 export interface CtxProps {
     children: string | JSX.Element | JSX.Element[] | '() => JSX.Element'
+}
+
+export type SceneProps = {
+    ratio: number
 }
